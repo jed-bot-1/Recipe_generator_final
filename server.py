@@ -24,7 +24,7 @@ def load_model_and_data():
     
     try:
         # Load the model
-        with open('recipe_model.pkl', 'rb') as f:
+        with open('recipe_model.joblib', 'rb') as f:
             model = pickle.load(f)
         logger.info("✅ Model loaded successfully")
         
