@@ -25,6 +25,14 @@ def load_data():
         df_recipes = pd.read_csv('Recipe.csv')
         logger.info(f"✅ CSV loaded: {len(df_recipes)} recipes")
         
+        # Debug: Show column names and sample data
+        logger.info(f"CSV columns: {df_recipes.columns.tolist()}")
+        if len(df_recipes) > 0:
+            logger.info("Sample of first recipe:")
+            logger.info(f"  Name: {df_recipes.iloc[0].get('name', 'N/A')}")
+            logger.info(f"  Ingredients: {str(df_recipes.iloc[0].get('ingredients', 'N/A'))[:100]}...")
+            logger.info(f"  Cuisine: {df_recipes.iloc[0].get('cuisine', 'N/A')}")
+        
         # Try to load model but don't fail if it doesn't work
         try:
             with open('recipe_model.pkl', 'rb') as f:
@@ -43,15 +51,19 @@ def find_similar_recipes(ingredients, top_n=5):
         return []
     
     ingredients_lower = [ingredient.lower().strip() for ingredient in ingredients]
+    logger.info(f"🔍 Searching for recipes with ingredients: {ingredients_lower}")
     
     matches = []
     for idx, row in df_recipes.iterrows():
-        recipe_ingredients = str(row['ingredients']).lower()
+        # Get ingredients - handle missing values
+        recipe_ingredients = str(row.get('ingredients', '')).lower()
+        recipe_name = str(row.get('name', 'Unknown Recipe'))
         
         match_count = 0
         matched_ingredients = []
         
         for user_ing in ingredients_lower:
+            # More flexible matching
             if user_ing and user_ing in recipe_ingredients:
                 match_count += 1
                 matched_ingredients.append(user_ing)
@@ -61,16 +73,21 @@ def find_similar_recipes(ingredients, top_n=5):
                 'match_count': match_count,
                 'matched_ingredients': matched_ingredients,
                 'recipe': {
-                    'name': row.get('name', 'Unknown Recipe'),
+                    'name': recipe_name,
                     'cuisine': row.get('cuisine', 'Unknown'),
-                    'ingredients': row.get('ingredients', ''),
+                    'ingredients': recipe_ingredients,
                     'instructions': row.get('instructions', 'No instructions available'),
                     'cooking_time': row.get('cooking_time', 'Not specified'),
                     'difficulty': row.get('difficulty', 'Not specified')
                 }
             })
+            logger.info(f"  ✅ Found match: {recipe_name} ({match_count} ingredients matched)")
     
+    # Sort by number of matches
     matches.sort(key=lambda x: x['match_count'], reverse=True)
+    
+    logger.info(f"📊 Total matches found: {len(matches)}")
+    
     return [match['recipe'] for match in matches[:top_n]]
 
 # Health check
@@ -78,7 +95,8 @@ def find_similar_recipes(ingredients, top_n=5):
 def health_check():
     return jsonify({
         "status": "healthy", 
-        "recipes_loaded": len(df_recipes) if df_recipes is not None else 0
+        "recipes_loaded": len(df_recipes) if df_recipes is not None else 0,
+        "columns": df_recipes.columns.tolist() if df_recipes is not None else []
     })
 
 # Home
@@ -86,7 +104,11 @@ def health_check():
 def home():
     return jsonify({
         "message": "Recipe Generator API",
-        "status": "running"
+        "status": "running",
+        "endpoints": {
+            "/health": "Health check",
+            "/generate": "Generate recipes (POST)"
+        }
     })
 
 # Generate recipes
@@ -100,12 +122,34 @@ def generate_recipe():
         
         ingredients = data.get('ingredients', [])
         
-        if not ingredients or not isinstance(ingredients, list):
-            return jsonify({"success": False, "error": "Ingredients must be a non-empty list"}), 400
+        # Handle both string and list input
+        if isinstance(ingredients, str):
+            # Split string by commas and clean up
+            ingredients = [ing.strip() for ing in ingredients.split(',')]
+            ingredients = [ing for ing in ingredients if ing]  # Remove empty strings
+        elif not isinstance(ingredients, list):
+            return jsonify({
+                "success": False, 
+                "error": "Ingredients must be a list or comma-separated string"
+            }), 400
         
-        logger.info(f"Received request for ingredients: {ingredients}")
+        if not ingredients:
+            return jsonify({
+                "success": False,
+                "error": "Ingredients list cannot be empty"
+            }), 400
+        
+        logger.info(f"🎯 Received request for ingredients: {ingredients}")
         
         similar_recipes = find_similar_recipes(ingredients, top_n=5)
+        
+        if not similar_recipes:
+            return jsonify({
+                "success": True,
+                "message": "No recipes found with these exact ingredients. Try more common ingredients or check spelling.",
+                "ingredients": ingredients,
+                "recipes": []
+            })
         
         return jsonify({
             "success": True,
@@ -115,7 +159,7 @@ def generate_recipe():
         })
         
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"❌ Error: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
