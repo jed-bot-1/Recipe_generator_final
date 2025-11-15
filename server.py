@@ -22,7 +22,7 @@ def load_data():
     
     try:
         # Load the recipe data
-        df_recipes = pd.read_csv('Recipes.csv')
+        df_recipes = pd.read_csv('Recipe.csv')
         logger.info(f"✅ CSV loaded: {len(df_recipes)} recipes")
         
         # Try to load model but don't fail if it doesn't work
