@@ -29,9 +29,9 @@ def load_data():
         logger.info(f"CSV columns: {df_recipes.columns.tolist()}")
         if len(df_recipes) > 0:
             logger.info("Sample of first recipe:")
-            logger.info(f"  Name: {df_recipes.iloc[0].get('name', 'N/A')}")
+            logger.info(f"  Name: {df_recipes.iloc[0].get('recipe_name', 'N/A')}")
             logger.info(f"  Ingredients: {str(df_recipes.iloc[0].get('ingredients', 'N/A'))[:100]}...")
-            logger.info(f"  Cuisine: {df_recipes.iloc[0].get('cuisine', 'N/A')}")
+            logger.info(f"  Steps: {str(df_recipes.iloc[0].get('steps', 'N/A'))[:100]}...")
         
         # Try to load model but don't fail if it doesn't work
         try:
@@ -55,15 +55,15 @@ def find_similar_recipes(ingredients, top_n=5):
     
     matches = []
     for idx, row in df_recipes.iterrows():
-        # Get ingredients - handle missing values
+        # Use the correct column names from your CSV
         recipe_ingredients = str(row.get('ingredients', '')).lower()
-        recipe_name = str(row.get('name', 'Unknown Recipe'))
+        recipe_name = str(row.get('recipe_name', 'Unknown Recipe'))
         
         match_count = 0
         matched_ingredients = []
         
         for user_ing in ingredients_lower:
-            # More flexible matching
+            # More flexible matching - check if ingredient appears in the recipe ingredients
             if user_ing and user_ing in recipe_ingredients:
                 match_count += 1
                 matched_ingredients.append(user_ing)
@@ -74,11 +74,10 @@ def find_similar_recipes(ingredients, top_n=5):
                 'matched_ingredients': matched_ingredients,
                 'recipe': {
                     'name': recipe_name,
-                    'cuisine': row.get('cuisine', 'Unknown'),
                     'ingredients': recipe_ingredients,
-                    'instructions': row.get('instructions', 'No instructions available'),
-                    'cooking_time': row.get('cooking_time', 'Not specified'),
-                    'difficulty': row.get('difficulty', 'Not specified')
+                    'ingredient_quantities': row.get('ingredient_quantities', 'Not specified'),
+                    'steps': row.get('steps', 'No instructions available'),
+                    # Note: 'cuisine', 'cooking_time', 'difficulty' columns don't exist in your CSV
                 }
             })
             logger.info(f"  ✅ Found match: {recipe_name} ({match_count} ingredients matched)")
